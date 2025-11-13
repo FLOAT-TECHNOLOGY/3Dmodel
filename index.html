@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Model Viewer</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #buttons {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .hamburger {
+            padding: 20px 25px;
+            font-size: 0;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            backdrop-filter: blur(10px) brightness(0.8);
+            -webkit-backdrop-filter: blur(10px) brightness(0.8);
+            cursor: pointer;
+            transition: backdrop-filter 0.3s;
+            position: relative;
+            width: 60px;
+            height: 60px;
+        }
+        .hamburger:hover {
+            backdrop-filter: blur(12px) brightness(0.75);
+        }
+        .hamburger span {
+            display: block;
+            width: 30px;
+            height: 4px;
+            background-color: white;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: all 0.3s;
+        }
+        .hamburger span:nth-child(1) { top: 18px; }
+        .hamburger span:nth-child(2) { top: 28px; }
+        .hamburger span:nth-child(3) { top: 38px; }
+        .hamburger.active span:nth-child(1) {
+            top: 28px;
+            transform: translateX(-50%) rotate(45deg);
+        }
+        .hamburger.active span:nth-child(2) { opacity: 0; }
+        .hamburger.active span:nth-child(3) {
+            top: 28px;
+            transform: translateX(-50%) rotate(-45deg);
+        }
+        button {
+            padding: 20px 30px;
+            font-size: 20px;
+            border: none;
+            border-radius: 8px;
+            color: black;
+            cursor: pointer;
+            transition: backdrop-filter 0.3s;
+            width: 220px;
+            text-align: left;
+            background: transparent;
+            backdrop-filter: blur(10px) brightness(0.8);
+            -webkit-backdrop-filter: blur(10px) brightness(0.8);
+            touch-action: manipulation;
+        }
+        button:hover {
+            backdrop-filter: blur(12px) brightness(0.75);
+        }
+        #addBtn, #editViewsBtn, #createHotspotBtn, #editHotspotsBtn, #devModeOptionsBtn, #resetBtn, #playBtn, #pauseBtn, #tourBtn, #pauseTourBtn, #autoRotateBtn, #toggleHotspotsBtn {
+            display: none;
+            background: transparent;
+        }
+        #addBtn:hover, #editViewsBtn:hover, #createHotspotBtn:hover, #editHotspotsBtn:hover, #devModeOptionsBtn:hover, #resetBtn:hover, #playBtn:hover, #pauseBtn:hover, #tourBtn:hover, #pauseTourBtn:hover, #autoRotateBtn:hover, #toggleHotspotsBtn:hover {
+            backdrop-filter: blur(12px) brightness(0.75);
+        }
+        #hotspot-panel, #view-panel, #input-modal {
+            position: absolute;
+            right: 20px;
+            background: transparent;
+            padding: 20px;
+            border-radius: 8px;
+            width: 250px;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            user-select: none;
+            backdrop-filter: blur(10px) brightness(0.8);
+            -webkit-backdrop-filter: blur(10px) brightness(0.8);
+        }
+        #hotspot-panel { top: 20px; }
+        #view-panel { top: 320px; }
+        #input-modal { top: 20px; }
+        #hotspot-list, #view-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #hotspot-list button, #view-list button {
+            width: 100%;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        label {
+            font-size: 16px;
+            color: black;
+        }
+        input[type="range"], select, input[type="text"] {
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+        }
+        #save-hotspot, #close-hotspot-panel, #drag-text-btn, #drag-line-btn, #save-view, #close-view-panel, #submit-input, #cancel-input {
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            color: black;
+            cursor: pointer;
+            background: transparent;
+            backdrop-filter: blur(10px) brightness(0.8);
+            -webkit-backdrop-filter: blur(10px) brightness(0.8);
+            transition: backdrop-filter 0.3s;
+        }
+        #save-hotspot:hover, #close-hotspot-panel:hover, #drag-text-btn:hover, #drag-line-btn:hover, #save-view:hover, #close-view-panel:hover, #submit-input:hover, #cancel-input:hover {
+            backdrop-filter: blur(12px) brightness(0.75);
+        }
+        #drag-text-btn.active, #drag-line-btn.active {
+            backdrop-filter: blur(12px) brightness(0.9);
+        }
+        .annotation {
+            position: absolute;
+            background: transparent;
+            color: #333333;
+            padding: 12px;
+            border-radius: 5px;
+            pointer-events: none;
+            display: none;
+            z-index: 1;
+        }
+        #background-color {
+            display: none;
+        }
+        #hotspot-message {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: transparent;
+            backdrop-filter: blur(10px) brightness(0.8);
+            -webkit-backdrop-filter: blur(10px) brightness(0.8);
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            color: black;
+            display: none;
+        }
+        #bottom-right-image {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 100px;
+            height: auto;
+            z-index: 10;
+        }
+        @supports not (backdrop-filter: blur(10px)) {
+            .hamburger {
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.15));
+            }
+            .hamburger:hover {
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.2));
+            }
+            button {
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.15));
+            }
+            #addBtn, #editViewsBtn, #createHotspotBtn, #editHotspotsBtn, #devModeOptionsBtn, #resetBtn, #playBtn, #pauseBtn, #tourBtn, #pauseTourBtn, #autoRotateBtn, #toggleHotspotsBtn, #save-hotspot, #close-hotspot-panel, #drag-text-btn, #drag-line-btn, #save-view, #close-view-panel, #submit-input, #cancel-input {
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.15));
+            }
+            button:hover {
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.2));
+            }
+            #hotspot-panel, #view-panel, #input-modal, #hotspot-message {
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.8));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="buttons">
+        <button id="devModeBtn" class="hamburger">
+            <span></span><span></span><span></span>
+        </button>
+        <button id="devModeOptionsBtn">Dev Mode Options</button>
+        <button id="addBtn">Add View</button>
+        <button id="editViewsBtn">Edit Views</button>
+        <button id="createHotspotBtn">Create Hotspot</button>
+        <button id="editHotspotsBtn">Edit Hotspots</button>
+        <button id="toggleHotspotsBtn">Toggle Hotspots</button>
+        <button id="resetBtn">Reset View</button>
+        <button id="playBtn">Play Animation</button>
+        <button id="pauseBtn">Pause Animation</button>
+        <button id="tourBtn">Start Tour</button>
+        <button id="pauseTourBtn">Pause Tour</button>
+        <button id="autoRotateBtn">Toggle Auto-Rotate</button>
+    </div>
+    <div id="hotspot-panel">
+        <h3 id="panel-title">Hotspot Settings</h3>
+        <div id="hotspot-list"></div>
+        <label for="hotspot-text">Text:</label>
+        <input id="hotspot-text" type="text">
+        <label for="font-size">Font Size (px):</label>
+        <input id="font-size" type="range" min="10" max="50" value="20">
+        <span id="font-size-value">20</span>
+        <label for="line-length">Line Length:</label>
+        <input id="line-length" type="range" min="0.1" max="5" step="0.1" value="0.5">
+        <span id="line-length-value">0.5</span>
+        <label for="line-angle">Line Angle (deg):</label>
+        <input id="line-angle" type="range" min="0" max="360" step="1" value="45">
+        <span id="line-angle-value">45</span>
+        <label for="text-offset-x">Text Offset X (px):</label>
+        <input id="text-offset-x" type="range" min="-50" max="50" value="0">
+        <span id="text-offset-x-value">0</span>
+        <label for="text-offset-y">Text Offset Y (px):</label>
+        <input id="text-offset-y" type="range" min="-50" max="50" value="0">
+        <span id="text-offset-y-value">0</span>
+        <label for="background-type">Background:</label>
+        <select id="background-type">
+            <option value="none">No Background</option>
+            <option value="color">Color Background</option>
+            <option value="blur">Blur Background</option>
+        </select>
+        <label for="background-color">Background Color:</label>
+        <input id="background-color" type="color" value="#ffffff">
+        <button id="drag-text-btn">Drag to Reposition Text</button>
+        <button id="drag-line-btn">Drag to Reposition Line</button>
+        <button id="save-hotspot">Save</button>
+        <button id="close-hotspot-panel">Close</button>
+    </div>
+    <div id="view-panel">
+        <h3 id="view-panel-title">View Settings</h3>
+        <div id="view-list"></div>
+        <label for="view-name">View Name:</label>
+        <input id="view-name" type="text">
+        <button id="save-view">Save</button>
+        <button id="close-view-panel">Close</button>
+    </div>
+    <div id="input-modal">
+        <label id="input-label"></label>
+        <input id="input-text" type="text">
+        <button id="submit-input">Submit</button>
+        <button id="cancel-input">Cancel</button>
+    </div>
+    <div id="hotspot-message">Click or tap on the model to set hotspot position</div>
+    <img id="bottom-right-image" src="image.png" alt="Image">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./three.module.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from './OrbitControls.js';
+        import { GLTFLoader } from './GLTFLoader.js';
+        import { RGBELoader } from './RGBELoader.js';
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.8;
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        new RGBELoader().load('underwater.hdr', (texture) => {
+            const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+            scene.background = envMap;
+            scene.environment = envMap;
+            texture.dispose();
+            pmremGenerator.dispose();
+        }, undefined, (error) => {
+            console.error('HDRI load error:', error);
+        });
+        const ambientLight = new THREE.AmbientLight(0x404040, 2.0);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0x80c0ff, 1.5);
+        directionalLight.position.set(0, 10, 10);
+        scene.add(directionalLight);
+        const innerLight = new THREE.PointLight(0x80c0ff, 2.0, 100);
+        innerLight.position.set(0, 0, 0);
+        scene.add(innerLight);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.enableTouch = true;
+        let savedViews = [];
+        let hotspots = [];
+        let devMode = false;
+        let devModeOptions = false;
+        let autoRotate = false;
+        let tourActive = false;
+        let tourPaused = false;
+        let currentTourIndex = 0;
+        let mixer = null;
+        let fanAction = null;
+        let animPlaying = false;
+        let model = null;
+        let transitioning = false;
+        let transitionStartTime = 0;
+        const transitionDuration = 1;
+        let startPosition = new THREE.Vector3();
+        let startTarget = new THREE.Vector3();
+        let endPosition = new THREE.Vector3();
+        let endTarget = new THREE.Vector3();
+        const annotationDivs = [];
+        let awaitingHotspotClick = false;
+        let currentEditingHotspot = null;
+        let currentEditingView = null;
+        let draggingText = false;
+        let draggingLine = false;
+        let mouseDown = false;
+        let previousMouse = new THREE.Vector2();
+        let hotspotsEnabled = true;
+        const hotspotPanel = document.getElementById('hotspot-panel');
+        const panelTitle = document.getElementById('panel-title');
+        const hotspotList = document.getElementById('hotspot-list');
+        const hotspotText = document.getElementById('hotspot-text');
+        const fontSizeSlider = document.getElementById('font-size');
+        const fontSizeValue = document.getElementById('font-size-value');
+        const lineLengthSlider = document.getElementById('line-length');
+        const lineLengthValue = document.getElementById('line-length-value');
+        const lineAngleSlider = document.getElementById('line-angle');
+        const lineAngleValue = document.getElementById('line-angle-value');
+        const textOffsetXSlider = document.getElementById('text-offset-x');
+        const textOffsetXValue = document.getElementById('text-offset-x-value');
+        const textOffsetYSlider = document.getElementById('text-offset-y');
+        const textOffsetYValue = document.getElementById('text-offset-y-value');
+        const backgroundTypeSelect = document.getElementById('background-type');
+        const backgroundColorInput = document.getElementById('background-color');
+        const saveHotspot = document.getElementById('save-hotspot');
+        const closeHotspotPanel = document.getElementById('close-hotspot-panel');
+        const dragTextBtn = document.getElementById('drag-text-btn');
+        const dragLineBtn = document.getElementById('drag-line-btn');
+        const viewPanel = document.getElementById('view-panel');
+        const viewPanelTitle = document.getElementById('view-panel-title');
+        const viewList = document.getElementById('view-list');
+        const viewNameInput = document.getElementById('view-name');
+        const saveView = document.getElementById('save-view');
+        const closeViewPanel = document.getElementById('close-view-panel');
+        const inputModal = document.getElementById('input-modal');
+        const inputLabel = document.getElementById('input-label');
+        const inputText = document.getElementById('input-text');
+        const submitInput = document.getElementById('submit-input');
+        const cancelInput = document.getElementById('cancel-input');
+        const hotspotMessage = document.getElementById('hotspot-message');
+        function createHotspot(position, text, fontSize = 20, lineLength = 0.5, lineAngle = 45, textOffsetX = 0, textOffsetY = 0, backgroundType = 'none', backgroundColor = '#ffffff') {
+            const div = document.createElement('div');
+            div.className = 'annotation';
+            div.textContent = text;
+            div.style.fontSize = `${fontSize}px`;
+            if (backgroundType === 'color') {
+                div.style.background = backgroundColor;
+                div.style.padding = '12px';
+                div.style.borderRadius = '5px';
+            } else if (backgroundType === 'blur') {
+                div.style.background = 'rgba(255, 255, 255, 0.5)';
+                div.style.backdropFilter = 'blur(5px)';
+                div.style.webkitBackdropFilter = 'blur(5px)';
+                div.style.padding = '12px';
+                div.style.borderRadius = '5px';
+            } else {
+                div.style.background = 'transparent';
+                div.style.backdropFilter = 'none';
+                div.style.webkitBackdropFilter = 'none';
+                div.style.padding = '12px';
+                div.style.borderRadius = '0';
+            }
+            document.body.appendChild(div);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const angleRad = lineAngle * Math.PI / 180;
+            const lineEnd = position.clone().add(new THREE.Vector3(lineLength * Math.cos(angleRad), lineLength * Math.sin(angleRad), 0));
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints([position, lineEnd]);
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            scene.add(line);
+            const hotspot = { position, lineEnd, div, line, text, fontSize, lineLength, lineAngle, textOffsetX, textOffsetY, backgroundType, backgroundColor };
+            annotationDivs.push(hotspot);
+            hotspots.push(hotspot);
+            return hotspot;
+        }
+        function updateHotspot(hotspot) {
+            hotspot.div.textContent = hotspot.text;
+            hotspot.div.style.fontSize = `${hotspot.fontSize}px`;
+            if (hotspot.backgroundType === 'color') {
+                hotspot.div.style.background = hotspot.backgroundColor;
+                hotspot.div.style.padding = '12px';
+                hotspot.div.style.borderRadius = '5px';
+                hotspot.div.style.backdropFilter = 'none';
+                hotspot.div.style.webkitBackdropFilter = 'none';
+            } else if (hotspot.backgroundType === 'blur') {
+                hotspot.div.style.background = 'rgba(255, 255, 255, 0.5)';
+                hotspot.div.style.backdropFilter = 'blur(5px)';
+                hotspot.div.style.webkitBackdropFilter = 'blur(5px)';
+                hotspot.div.style.padding = '12px';
+                hotspot.div.style.borderRadius = '5px';
+            } else {
+                hotspot.div.style.background = 'transparent';
+                hotspot.div.style.backdropFilter = 'none';
+                hotspot.div.style.webkitBackdropFilter = 'none';
+                hotspot.div.style.padding = '12px';
+                hotspot.div.style.borderRadius = '0';
+            }
+            const angleRad = hotspot.lineAngle * Math.PI / 180;
+            hotspot.lineEnd = hotspot.position.clone().add(new THREE.Vector3(hotspot.lineLength * Math.cos(angleRad), hotspot.lineLength * Math.sin(angleRad), 0));
+            hotspot.line.geometry.setFromPoints([hotspot.position, hotspot.lineEnd]);
+            hotspot.line.geometry.attributes.position.needsUpdate = true;
+        }
+        function updateHotspots() {
+            if (!hotspotsEnabled) {
+                annotationDivs.forEach((hotspot) => {
+                    hotspot.div.style.display = 'none';
+                    hotspot.line.visible = false;
+                });
+                return;
+            }
+            annotationDivs.forEach((hotspot) => {
+                const lineEndScreen = hotspot.lineEnd.clone().project(camera);
+                const x = (lineEndScreen.x * 0.5 + 0.5) * window.innerWidth + hotspot.textOffsetX;
+                const y = (-lineEndScreen.y * 0.5 + 0.5) * window.innerHeight + hotspot.textOffsetY;
+                if (x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight) {
+                    hotspot.div.style.left = `${x}px`;
+                    hotspot.div.style.top = `${y}px`;
+                    hotspot.div.style.display = 'block';
+                } else {
+                    hotspot.div.style.display = 'none';
+                }
+                hotspot.line.visible = true;
+            });
+        }
+        function focusOnView(view) {
+            endPosition.copy(view.position);
+            endTarget.copy(view.target);
+            startPosition.copy(camera.position);
+            startTarget.copy(controls.target);
+            transitionStartTime = performance.now();
+            transitioning = true;
+        }
+        function startTour() {
+            if (savedViews.length === 0) return;
+            tourActive = true;
+            tourPaused = false;
+            currentTourIndex = 0;
+            focusOnView(savedViews[currentTourIndex]);
+            document.getElementById('tourBtn').style.display = 'none';
+            document.getElementById('pauseTourBtn').style.display = 'block';
+        }
+        function updateButtons() {
+            const buttonsDiv = document.getElementById('buttons');
+            savedViews.forEach((view, index) => {
+                let btn = document.getElementById(`viewBtn${index}`);
+                if (!btn) {
+                    btn = document.createElement('button');
+                    btn.id = `viewBtn${index}`;
+                    btn.textContent = view.name || `View ${index + 1}`;
+                    btn.addEventListener('click', () => focusOnView(view));
+                    buttonsDiv.insertBefore(btn, document.getElementById('devModeOptionsBtn'));
+                }
+            });
+        }
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        function onClick(event) {
+            event.preventDefault();
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            if (awaitingHotspotClick && model) {
+                const intersects = raycaster.intersectObject(model, true);
+                if (intersects.length > 0) {
+                    const position = intersects[0].point;
+                    awaitingHotspotClick = false;
+                    document.body.style.cursor = 'auto';
+                    hotspotMessage.style.display = 'none';
+                    inputModal.style.display = 'flex';
+                    inputLabel.textContent = 'Enter hotspot text:';
+                    inputText.value = '';
+                    inputText.focus();
+                    submitInput.onclick = () => {
+                        const text = inputText.value;
+                        inputModal.style.display = 'none';
+                        if (text) {
+                            currentEditingHotspot = createHotspot(position, text);
+                            showHotspotPanel('New Hotspot', currentEditingHotspot);
+                        }
+                    };
+                }
+                return;
+            }
+            const intersects = raycaster.intersectObject(model, true);
+            if (intersects.length > 0) {
+                const clickPosition = intersects[0].point;
+                const closestHotspot = hotspots.find(h => h.position.distanceTo(clickPosition) < 0.5);
+                if (closestHotspot) {
+                    closestHotspot.div.style.display = 'block';
+                    setTimeout(() => closestHotspot.div.style.display = 'none', 3000);
+                }
+            }
+        }
+        function onMouseDown(event) {
+            if (currentEditingHotspot && draggingText && !hotspotPanel.contains(event.target)) {
+                mouseDown = true;
+                previousMouse.set(event.clientX, event.clientY);
+            } else if (currentEditingHotspot && draggingLine && !hotspotPanel.contains(event.target)) {
+                mouseDown = true;
+                previousMouse.set(event.clientX, event.clientY);
+            }
+        }
+        function onMouseUp(event) {
+            mouseDown = false;
+        }
+        function onMouseMove(event) {
+            if (currentEditingHotspot && draggingText && mouseDown) {
+                const deltaX = event.clientX - previousMouse.x;
+                const deltaY = event.clientY - previousMouse.y;
+                currentEditingHotspot.textOffsetX += deltaX;
+                currentEditingHotspot.textOffsetY += deltaY;
+                textOffsetXSlider.value = currentEditingHotspot.textOffsetX;
+                textOffsetXValue.textContent = currentEditingHotspot.textOffsetX;
+                textOffsetYSlider.value = currentEditingHotspot.textOffsetY;
+                textOffsetYValue.textContent = currentEditingHotspot.textOffsetY;
+                previousMouse.set(event.clientX, event.clientY);
+            } else if (currentEditingHotspot && draggingLine && mouseDown) {
+                const mouse = new THREE.Vector2(
+                    (event.clientX / window.innerWidth) * 2 - 1,
+                    -(event.clientY / window.innerHeight) * 2 + 1
+                );
+                raycaster.setFromCamera(mouse, camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -currentEditingHotspot.position.z);
+                const intersect = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, intersect);
+                currentEditingHotspot.lineEnd.copy(intersect);
+                currentEditingHotspot.line.geometry.setFromPoints([currentEditingHotspot.position, currentEditingHotspot.lineEnd]);
+                currentEditingHotspot.line.geometry.attributes.position.needsUpdate = true;
+                const angleRad = Math.atan2(
+                    currentEditingHotspot.lineEnd.y - currentEditingHotspot.position.y,
+                    currentEditingHotspot.lineEnd.x - currentEditingHotspot.position.x
+                );
+                currentEditingHotspot.lineAngle = angleRad * 180 / Math.PI;
+                lineAngleSlider.value = currentEditingHotspot.lineAngle;
+                lineAngleValue.textContent = Math.round(currentEditingHotspot.lineAngle);
+                currentEditingHotspot.lineLength = currentEditingHotspot.position.distanceTo(currentEditingHotspot.lineEnd);
+                lineLengthSlider.value = currentEditingHotspot.lineLength;
+                lineLengthValue.textContent = currentEditingHotspot.lineLength.toFixed(1);
+            }
+        }
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('click', onClick);
+        document.addEventListener('touchstart', (event) => {
+            const touch = event.touches[0];
+            mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            if (awaitingHotspotClick && model) {
+                const intersects = raycaster.intersectObject(model, true);
+                if (intersects.length > 0) {
+                    const position = intersects[0].point;
+                    awaitingHotspotClick = false;
+                    document.body.style.cursor = 'auto';
+                    hotspotMessage.style.display = 'none';
+                    inputModal.style.display = 'flex';
+                    inputLabel.textContent = 'Enter hotspot text:';
+                    inputText.value = '';
+                    inputText.focus();
+                    submitInput.onclick = () => {
+                        const text = inputText.value;
+                        inputModal.style.display = 'none';
+                        if (text) {
+                            currentEditingHotspot = createHotspot(position, text);
+                            showHotspotPanel('New Hotspot', currentEditingHotspot);
+                        }
+                    };
+                }
+                return;
+            }
+            const intersects = raycaster.intersectObject(model, true);
+            if (intersects.length > 0) {
+                const clickPosition = intersects[0].point;
+                const closestHotspot = hotspots.find(h => h.position.distanceTo(clickPosition) < 0.5);
+                if (closestHotspot) {
+                    closestHotspot.div.style.display = 'block';
+                    setTimeout(() => closestHotspot.div.style.display = 'none', 3000);
+                }
+            }
+            if (currentEditingHotspot && draggingText && !hotspotPanel.contains(event.target)) {
+                mouseDown = true;
+                previousMouse.set(touch.clientX, touch.clientY);
+            }
+        }, { passive: false });
+        document.addEventListener('touchend', () => {
+            mouseDown = false;
+        }, { passive: false });
+        document.addEventListener('touchmove', (event) => {
+            if (currentEditingHotspot && draggingText && mouseDown) {
+                const touch = event.touches[0];
+                const deltaX = touch.clientX - previousMouse.x;
+                const deltaY = touch.clientY - previousMouse.y;
+                currentEditingHotspot.textOffsetX += deltaX;
+                currentEditingHotspot.textOffsetY += deltaY;
+                textOffsetXSlider.value = currentEditingHotspot.textOffsetX;
+                textOffsetXValue.textContent = currentEditingHotspot.textOffsetX;
+                textOffsetYSlider.value = currentEditingHotspot.textOffsetY;
+                textOffsetYValue.textContent = currentEditingHotspot.textOffsetY;
+                previousMouse.set(touch.clientX, touch.clientY);
+            }
+        }, { passive: false });
+        function showHotspotPanel(title, hotspot, position = null) {
+            panelTitle.textContent = title;
+            hotspotList.style.display = 'none';
+            hotspotText.style.display = 'block';
+            fontSizeSlider.style.display = 'block';
+            lineLengthSlider.style.display = 'block';
+            lineAngleSlider.style.display = 'block';
+            lineAngleValue.style.display = 'inline';
+            textOffsetXSlider.style.display = 'block';
+            textOffsetYSlider.style.display = 'block';
+            backgroundTypeSelect.style.display = 'block';
+            backgroundColorInput.style.display = backgroundTypeSelect.value === 'color' ? 'block' : 'none';
+            dragTextBtn.style.display = 'block';
+            dragLineBtn.style.display = 'block';
+            saveHotspot.style.display = 'block';
+            closeHotspotPanel.style.display = 'block';
+            controls.enableRotate = false;
+            if (hotspot) {
+                currentEditingHotspot = hotspot;
+                hotspotText.value = hotspot.text;
+                fontSizeSlider.value = hotspot.fontSize;
+                fontSizeValue.textContent = hotspot.fontSize;
+                lineLengthSlider.value = hotspot.lineLength;
+                lineLengthValue.textContent = hotspot.lineLength.toFixed(1);
+                lineAngleSlider.value = hotspot.lineAngle;
+                lineAngleValue.textContent = Math.round(hotspot.lineAngle);
+                textOffsetXSlider.value = hotspot.textOffsetX;
+                textOffsetXValue.textContent = hotspot.textOffsetX;
+                textOffsetYSlider.value = hotspot.textOffsetY;
+                textOffsetYValue.textContent = hotspot.textOffsetY;
+                backgroundTypeSelect.value = hotspot.backgroundType;
+                backgroundColorInput.value = hotspot.backgroundColor;
+                backgroundColorInput.style.display = hotspot.backgroundType === 'color' ? 'block' : 'none';
+            } else {
+                currentEditingHotspot = createHotspot(position, '', 20, 0.5, 45, 0, 0, 'none', '#ffffff');
+                hotspotText.value = '';
+                fontSizeSlider.value = 20;
+                fontSizeValue.textContent = 20;
+                lineLengthSlider.value = 0.5;
+                lineLengthValue.textContent = '0.5';
+                lineAngleSlider.value = 45;
+                lineAngleValue.textContent = '45';
+                textOffsetXSlider.value = 0;
+                textOffsetXValue.textContent = 0;
+                textOffsetYSlider.value = 0;
+                textOffsetYValue.textContent = 0;
+                backgroundTypeSelect.value = 'none';
+                backgroundColorInput.value = '#ffffff';
+                backgroundColorInput.style.display = 'none';
+            }
+            hotspotPanel.style.display = 'flex';
+            draggingText = false;
+            draggingLine = false;
+            dragTextBtn.classList.remove('active');
+            dragLineBtn.classList.remove('active');
+        }
+        function showEditHotspotList() {
+            panelTitle.textContent = 'Edit Hotspots';
+            hotspotList.innerHTML = '';
+            hotspots.forEach((hotspot, index) => {
+                const btn = document.createElement('button');
+                btn.textContent = hotspot.text || `Hotspot ${index + 1}`;
+                btn.addEventListener('click', () => showHotspotPanel('Edit Hotspot', hotspot));
+                hotspotList.appendChild(btn);
+            });
+            hotspotList.style.display = 'block';
+            hotspotText.style.display = 'none';
+            fontSizeSlider.style.display = 'none';
+            lineLengthSlider.style.display = 'none';
+            lineAngleSlider.style.display = 'none';
+            lineAngleValue.style.display = 'none';
+            textOffsetXSlider.style.display = 'none';
+            textOffsetYSlider.style.display = 'none';
+            backgroundTypeSelect.style.display = 'none';
+            backgroundColorInput.style.display = 'none';
+            dragTextBtn.style.display = 'none';
+            dragLineBtn.style.display = 'none';
+            saveHotspot.style.display = 'none';
+            closeHotspotPanel.style.display = 'block';
+            hotspotPanel.style.display = 'flex';
+            currentEditingHotspot = null;
+            draggingText = false;
+            draggingLine = false;
+            dragTextBtn.classList.remove('active');
+            dragLineBtn.classList.remove('active');
+            controls.enableRotate = false;
+        }
+        function showViewPanel(title, view) {
+            viewPanelTitle.textContent = title;
+            viewList.style.display = 'none';
+            viewNameInput.style.display = 'block';
+            saveView.style.display = 'block';
+            closeViewPanel.style.display = 'block';
+            controls.enableRotate = false;
+            if (view) {
+                currentEditingView = view;
+                viewNameInput.value = view.name;
+            } else {
+                currentEditingView = { position: camera.position.clone(), target: controls.target.clone(), name: '' };
+                viewNameInput.value = '';
+            }
+            viewPanel.style.display = 'flex';
+        }
+        function showEditViewList() {
+            viewPanelTitle.textContent = 'Edit Views';
+            viewList.innerHTML = '';
+            savedViews.forEach((view, index) => {
+                const btn = document.createElement('button');
+                btn.textContent = view.name || `View ${index + 1}`;
+                btn.addEventListener('click', () => showViewPanel('Edit View', view));
+                viewList.appendChild(btn);
+            });
+            viewList.style.display = 'block';
+            viewNameInput.style.display = 'none';
+            saveView.style.display = 'none';
+            closeViewPanel.style.display = 'block';
+            viewPanel.style.display = 'flex';
+            currentEditingView = null;
+            controls.enableRotate = false;
+        }
+        fontSizeSlider.addEventListener('input', () => {
+            fontSizeValue.textContent = fontSizeSlider.value;
+            currentEditingHotspot.fontSize = parseFloat(fontSizeSlider.value);
+            updateHotspot(currentEditingHotspot);
+        });
+        lineLengthSlider.addEventListener('input', () => {
+            lineLengthValue.textContent = lineLengthSlider.value;
+            currentEditingHotspot.lineLength = parseFloat(lineLengthSlider.value);
+            updateHotspot(currentEditingHotspot);
+        });
+        lineAngleSlider.addEventListener('input', () => {
+            lineAngleValue.textContent = lineAngleSlider.value;
+            currentEditingHotspot.lineAngle = parseFloat(lineAngleSlider.value);
+            updateHotspot(currentEditingHotspot);
+        });
+        textOffsetXSlider.addEventListener('input', () => {
+            textOffsetXValue.textContent = textOffsetXSlider.value;
+            currentEditingHotspot.textOffsetX = parseFloat(textOffsetXSlider.value);
+            updateHotspot(currentEditingHotspot);
+        });
+        textOffsetYSlider.addEventListener('input', () => {
+            textOffsetYValue.textContent = textOffsetYSlider.value;
+            currentEditingHotspot.textOffsetY = parseFloat(textOffsetYSlider.value);
+            updateHotspot(currentEditingHotspot);
+        });
+        backgroundTypeSelect.addEventListener('change', () => {
+            currentEditingHotspot.backgroundType = backgroundTypeSelect.value;
+            backgroundColorInput.style.display = backgroundTypeSelect.value === 'color' ? 'block' : 'none';
+            updateHotspot(currentEditingHotspot);
+        });
+        backgroundColorInput.addEventListener('input', () => {
+            currentEditingHotspot.backgroundColor = backgroundColorInput.value;
+            updateHotspot(currentEditingHotspot);
+        });
+        hotspotText.addEventListener('input', () => {
+            currentEditingHotspot.text = hotspotText.value;
+            updateHotspot(currentEditingHotspot);
+        });
+        dragTextBtn.addEventListener('click', () => {
+            draggingText = !draggingText;
+            draggingLine = false;
+            dragTextBtn.classList.toggle('active', draggingText);
+            dragLineBtn.classList.remove('active');
+        });
+        dragLineBtn.addEventListener('click', () => {
+            draggingLine = !draggingLine;
+            draggingText = false;
+            dragLineBtn.classList.toggle('active', draggingLine);
+            dragTextBtn.classList.remove('active');
+        });
+        saveHotspot.addEventListener('click', () => {
+            if (!hotspots.includes(currentEditingHotspot)) {
+                hotspots.push(currentEditingHotspot);
+                annotationDivs.push(currentEditingHotspot);
+            }
+            updateHotspot(currentEditingHotspot);
+            hotspotPanel.style.display = 'none';
+            currentEditingHotspot = null;
+            draggingText = false;
+            draggingLine = false;
+            dragTextBtn.classList.remove('active');
+            dragLineBtn.classList.remove('active');
+            controls.enableRotate = true;
+        });
+        closeHotspotPanel.addEventListener('click', () => {
+            hotspotPanel.style.display = 'none';
+            currentEditingHotspot = null;
+            draggingText = false;
+            draggingLine = false;
+            dragTextBtn.classList.remove('active');
+            dragLineBtn.classList.remove('active');
+            controls.enableRotate = true;
+            hotspotMessage.style.display = 'none';
+        });
+        saveView.addEventListener('click', () => {
+            if (!savedViews.includes(currentEditingView)) {
+                savedViews.push(currentEditingView);
+            }
+            currentEditingView.name = viewNameInput.value;
+            currentEditingView.position = camera.position.clone();
+            currentEditingView.target = controls.target.clone();
+            viewPanel.style.display = 'none';
+            currentEditingView = null;
+            controls.enableRotate = true;
+            document.getElementById('tourBtn').style.display = devMode && devModeOptions && savedViews.length > 0 ? 'block' : 'none';
+        });
+        closeViewPanel.addEventListener('click', () => {
+            viewPanel.style.display = 'none';
+            currentEditingView = null;
+            controls.enableRotate = true;
+        });
+        submitInput.addEventListener('click', () => {
+            inputModal.style.display = 'none';
+        });
+        cancelInput.addEventListener('click', () => {
+            inputModal.style.display = 'none';
+            awaitingHotspotClick = false;
+            document.body.style.cursor = 'auto';
+            hotspotMessage.style.display = 'none';
+        });
+        document.getElementById('devModeBtn').addEventListener('click', () => {
+            devMode = !devMode;
+            document.getElementById('devModeBtn').classList.toggle('active');
+            document.getElementById('devModeOptionsBtn').style.display = devMode ? 'block' : 'none';
+            document.getElementById('resetBtn').style.display = devMode ? 'block' : 'none';
+            document.getElementById('playBtn').style.display = devMode && fanAction ? 'block' : 'none';
+            document.getElementById('pauseBtn').style.display = devMode && fanAction ? 'block' : 'none';
+            document.getElementById('autoRotateBtn').style.display = devMode ? 'block' : 'none';
+            document.getElementById('toggleHotspotsBtn').style.display = devMode ? 'block' : 'none';
+            if (!devMode) {
+                devModeOptions = false;
+                document.getElementById('addBtn').style.display = 'none';
+                document.getElementById('editViewsBtn').style.display = 'none';
+                document.getElementById('createHotspotBtn').style.display = 'none';
+                document.getElementById('editHotspotsBtn').style.display = 'none';
+                document.getElementById('tourBtn').style.display = 'none';
+                document.getElementById('pauseTourBtn').style.display = 'none';
+                updateButtons();
+            }
+        });
+        document.getElementById('devModeOptionsBtn').addEventListener('click', () => {
+            devModeOptions = !devModeOptions;
+            document.getElementById('addBtn').style.display = devModeOptions ? 'block' : 'none';
+            document.getElementById('editViewsBtn').style.display = devModeOptions ? 'block' : 'none';
+            document.getElementById('createHotspotBtn').style.display = devModeOptions ? 'block' : 'none';
+            document.getElementById('editHotspotsBtn').style.display = devModeOptions ? 'block' : 'none';
+            document.getElementById('tourBtn').style.display = devModeOptions && savedViews.length > 0 ? 'block' : 'none';
+        });
+        document.getElementById('addBtn').addEventListener('click', () => {
+            inputModal.style.display = 'flex';
+            inputLabel.textContent = 'Enter view name (e.g., Pump View):';
+            inputText.value = '';
+            inputText.focus();
+            submitInput.onclick = () => {
+                const name = inputText.value;
+                inputModal.style.display = 'none';
+                if (name) {
+                    savedViews.push({
+                        position: camera.position.clone(),
+                        target: controls.target.clone(),
+                        name: name
+                    });
+                    document.getElementById('tourBtn').style.display = devMode && devModeOptions && savedViews.length > 0 ? 'block' : 'none';
+                }
+            };
+        });
+        document.getElementById('editViewsBtn').addEventListener('click', () => {
+            showEditViewList();
+        });
+        document.getElementById('createHotspotBtn').addEventListener('click', () => {
+            awaitingHotspotClick = true;
+            document.body.style.cursor = 'crosshair';
+            hotspotMessage.style.display = 'block';
+            setTimeout(() => hotspotMessage.style.display = 'none', 3000);
+        });
+        document.getElementById('editHotspotsBtn').addEventListener('click', () => {
+            showEditHotspotList();
+        });
+        document.getElementById('toggleHotspotsBtn').addEventListener('click', () => {
+            hotspotsEnabled = !hotspotsEnabled;
+            document.getElementById('toggleHotspotsBtn').textContent = hotspotsEnabled ? 'Disable Hotspots' : 'Enable Hotspots';
+        });
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            endPosition.set(0, 0, -5);
+            endTarget.set(0, 0, 0);
+            startPosition.copy(camera.position);
+            startTarget.copy(controls.target);
+            transitionStartTime = performance.now();
+            transitioning = true;
+            tourActive = false;
+            tourPaused = false;
+            document.getElementById('tourBtn').style.display = devMode && devModeOptions && savedViews.length > 0 ? 'block' : 'none';
+            document.getElementById('pauseTourBtn').style.display = 'none';
+        });
+        document.getElementById('playBtn').addEventListener('click', () => {
+            if (fanAction && !animPlaying) {
+                fanAction.play();
+                animPlaying = true;
+            }
+        });
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            if (fanAction && animPlaying) {
+                fanAction.paused = true;
+                animPlaying = false;
+            }
+        });
+        document.getElementById('tourBtn').addEventListener('click', startTour);
+        document.getElementById('pauseTourBtn').addEventListener('click', () => {
+            tourPaused = !tourPaused;
+            document.getElementById('pauseTourBtn').textContent = tourPaused ? 'Resume Tour' : 'Pause Tour';
+        });
+        document.getElementById('autoRotateBtn').addEventListener('click', () => {
+            autoRotate = !autoRotate;
+            controls.autoRotate = autoRotate;
+            document.getElementById('autoRotateBtn').textContent = autoRotate ? 'Stop Auto-Rotate' : 'Toggle Auto-Rotate';
+        });
+        const loader = new GLTFLoader();
+        loader.load('model1.glb', (gltf) => {
+            model = gltf.scene;
+            scene.add(model);
+            camera.position.set(0, 0, -5);
+            if (gltf.animations && gltf.animations.length > 0) {
+                mixer = new THREE.AnimationMixer(model);
+                fanAction = mixer.clipAction(gltf.animations[0]);
+            }
+        }, undefined, (error) => {
+            console.error('Error loading model:', error);
+        });
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateHotspots();
+        });
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+            if (transitioning) {
+                const elapsed = (performance.now() - transitionStartTime) / 1000;
+                const t = Math.min(elapsed / transitionDuration, 1);
+                camera.position.lerpVectors(startPosition, endPosition, t);
+                controls.target.lerpVectors(startTarget, endTarget, t);
+                if (t >= 1) {
+                    transitioning = false;
+                    if (tourActive && !tourPaused && savedViews.length > 0) {
+                        currentTourIndex = (currentTourIndex + 1) % savedViews.length;
+                        focusOnView(savedViews[currentTourIndex]);
+                    }
+                }
+            }
+            controls.update();
+            updateHotspots();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
