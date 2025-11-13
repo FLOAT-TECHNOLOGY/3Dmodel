@@ -402,6 +402,8 @@
             annotationDivs.push(hotspot);
             hotspots.push(hotspot);
             return hotspot;
+            const pos = [x, y, z];
+    addNewHotspot("Hotspot Name", pos, "Description");
         }
         function updateHotspot(hotspot) {
             hotspot.div.textContent = hotspot.text;
@@ -1025,3 +1027,4 @@ window.addEventListener('DOMContentLoaded', loadHotspots);
 </body>
 
 </html>
+
