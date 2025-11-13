@@ -988,5 +988,40 @@
         }
         animate();
     </script>
+    <script>
+let hotspots = [];
+
+// 🔹 Load hotspots from localStorage on page load
+function loadHotspots() {
+  const saved = localStorage.getItem('hotspots');
+  if (saved) {
+    hotspots = JSON.parse(saved);
+    hotspots.forEach(h => createHotspot(h.name, h.position, h.description));
+  }
+}
+
+// 🔹 Save hotspots to localStorage whenever they change
+function saveHotspots() {
+  localStorage.setItem('hotspots', JSON.stringify(hotspots));
+}
+
+// 🔹 Example function (replace with your actual hotspot creation logic)
+function createHotspot(name, position, description) {
+  // your 3D label or button code here...
+  console.log('Creating hotspot:', name, position);
+}
+
+// 🔹 Example of adding a new hotspot
+function addNewHotspot(name, position, description) {
+  hotspots.push({ name, position, description });
+  createHotspot(name, position, description);
+  saveHotspots();
+}
+
+// Run when page loads
+window.addEventListener('DOMContentLoaded', loadHotspots);
+</script>
+
 </body>
+
 </html>
